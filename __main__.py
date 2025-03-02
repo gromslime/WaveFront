@@ -22,8 +22,9 @@ def mainAction(fQ,
         ApertureRadius = 20  # mm
 
         C4 = 0
-        C11 = (-0.01395786 * 5**0.5)*0.525e-6
+        C11 = (0.027 * (5 **0.5))*1e-6
         C22 = 0
+        C37 = 0
 
     CONSTANTS.ApertureX = ApertureX
     CONSTANTS.fQ = fQ
@@ -36,24 +37,29 @@ def mainAction(fQ,
 
     # Mesh realization
     X,Y = np.meshgrid(X,Y)
-    R = (X**2 + Y**2) ** 0.5
+    R = (X**2 + Y**2) ** 0.5 / CONSTANTS.Radius
     Z = (CONSTANTS.C4 * (2 * R**2 - 1) +
-         CONSTANTS.C11 * (6*R**4 - 6*R**2 + 1))
+         CONSTANTS.C11 * (6*R**4 - 6*R**2 + 1) +
+         CONSTANTS.C22 * (20 * (R**6) - 30 * (R**4) + 12 * (R**2) - 1))
+
 
     # Aperture realization
     _indexes = np.where(((X + CONSTANTS.ApertureX)**2 + (Y + CONSTANTS.ApertureY)**2)**0.5 > CONSTANTS.ApertureRadius)
     Z[_indexes] = np.nan
+    X[_indexes] = np.nan
 
+    # fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
+    # ax.plot_surface(X, Y, Z, cmap=plt.cm.YlGnBu_r)
+    # plt.show()
 
-    dZy, dZx = np.gradient(Z)
-    dY, dX = np.gradient(X)
+    dZx = np.diff(Z)
+    dX = np.diff(X)
 
-
-    Der=-dZx/dX
+    Der=np.arctan(dZx/dX)
 
     Der_mean = Der
 
-    Deviation = np.mean(np.ravel(Der_mean[~np.isnan(Der_mean)]))
+    Deviation = np.degrees(np.mean(np.ravel(Der_mean[~np.isnan(Der_mean)])))
 
 
     Fi=Deviation*3600
@@ -61,27 +67,32 @@ def mainAction(fQ,
     return Fi
 
 
-Distance_list = [200]
-ApertureDiameter = 20
-ApertureDistancetoSUT = 10
+Distance_list = [200,500, 1000, 1500, 1900]
+Shift_list = [0]
+ApertureDiameter = 40
+ApertureDistancetoSUT = 0
 
 for distance in Distance_list:
-    for shift in [-8, -4, -2, 0, 2, 4, 8]:
+    for shift in Shift_list:
         X = []
         Y = list()
-        for i in tqdm(np.linspace(-1300, 1300, 40), desc = f"Analyzing for shift {shift} mm", leave = False):
+        for i in tqdm(np.linspace(-1300, 1300, 40), desc = f"Analyzing for shift {shift} mm Distance {distance}", leave = False):
             Da = ApertureDiameter - np.abs(np.tan(math.radians(2 * i/3600)) * ApertureDistancetoSUT)
-            dX = (distance * np.tan(math.radians(2 * i/3600)) +
-                  shift - ApertureDiameter/2 +
-                  Da/2)
-            Y.append(mainAction(fQ = 500,
+            dX = (distance * np.tan(math.radians(2 * i/3600)))
+            Y.append(mainAction(fQ = 250,
                                 Radius = 20,
                                 ApertureRadius = Da/2,
                                 ApertureY= 0,
                                 ApertureX= dX))
             X.append(i)
-        Y = detrend(Y)
-        plt.plot(X,Y, label = f"{shift} mm")
-    plt.grid()
-    plt.legend()
-    plt.show()
+
+        X = np.array(X)
+        Y = np.array(Y)
+
+        m,b = np.polyfit(X,Y,1)
+        Y_M = m*X + b
+        plt.plot(X,Y - Y_M, label = f"Shift {shift}  mm Distance {distance} mm")
+
+plt.grid()
+plt.legend()
+plt.show()
