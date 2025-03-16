@@ -19,10 +19,10 @@ def mainAction(fQ,
         Radius = 20  # mm
         ApertureX = 0  # mm
         ApertureY = 0  # mm
-        ApertureRadius = 20  # mm
+        ApertureRadius = 20 # mm
 
         C4 = 0
-        C11 = (0.027 * (5 **0.5))*1e-6
+        C11 = (-0.027 * (5 **0.5))*1e-3
         C22 = 0
         C37 = 0
 
@@ -31,6 +31,7 @@ def mainAction(fQ,
     CONSTANTS.Radius = Radius
     CONSTANTS.ApertureY = ApertureY
     CONSTANTS.ApertureRadius = ApertureRadius
+
     # X, Y series
     X = np.linspace(-CONSTANTS.Radius, CONSTANTS.Radius, CONSTANTS.fQ)
     Y = np.linspace(-CONSTANTS.Radius, CONSTANTS.Radius, CONSTANTS.fQ)
@@ -55,7 +56,7 @@ def mainAction(fQ,
     dZx = np.diff(Z)
     dX = np.diff(X)
 
-    Der=np.arctan(dZx/dX)
+    Der = -np.arctan(dZx/dX)
 
     Der_mean = Der
 
@@ -72,27 +73,56 @@ Shift_list = [0]
 ApertureDiameter = 40
 ApertureDistancetoSUT = 0
 
+# for distance in Distance_list:
+#     for shift in Shift_list:
+#         X = []
+#         Y = list()
+#         for i in tqdm(np.linspace(-1300, 1300, 40), desc = f"Analyzing for shift {shift} mm Distance {distance}", leave = False):
+#             Da = ApertureDiameter
+#             dX = (distance * np.tan(math.radians(2 * i/3600)))
+#             Y.append(mainAction(fQ = 250,
+#                                 Radius = 20,
+#                                 ApertureRadius = Da/2,
+#                                 ApertureY= 0,
+#                                 ApertureX= dX))
+#             X.append(i)
+#
+#         X = np.array(X)
+#         Y = np.array(Y)
+#
+#         m,b = np.polyfit(X,Y,1)
+#         Y_M = m*X + b
+#         plt.plot(X,Y - Y_M, label = f"Shift {shift}  mm Distance {distance} mm")
+
 for distance in Distance_list:
-    for shift in Shift_list:
-        X = []
-        Y = list()
-        for i in tqdm(np.linspace(-1300, 1300, 40), desc = f"Analyzing for shift {shift} mm Distance {distance}", leave = False):
-            Da = ApertureDiameter - np.abs(np.tan(math.radians(2 * i/3600)) * ApertureDistancetoSUT)
-            dX = (distance * np.tan(math.radians(2 * i/3600)))
-            Y.append(mainAction(fQ = 250,
-                                Radius = 20,
-                                ApertureRadius = Da/2,
-                                ApertureY= 0,
-                                ApertureX= dX))
-            X.append(i)
+    X = list()
+    Y = list()
+    for j in tqdm(np.linspace(-0.1, 0.1, 20), f"Distance {distance} mm"):
+        sub_X = list()
+        sub_Y = list()
+        for i in (np.linspace(-1300, 1300, 40)) :
+            dX = distance * np.tan(math.radians(2 * i/3600) + np.arctan(j/250))
+            sub_Y.append(mainAction(fQ = 250, Radius = 20,
+                                ApertureRadius= ApertureDiameter/2,
+                                ApertureY = 0,
+                                ApertureX = dX))
+            sub_X.append(i)
+        Y.append(sub_Y)
+        X.append(sub_X)
 
-        X = np.array(X)
-        Y = np.array(Y)
+    R = np.zeros(len(Y[0]))
+    G = np.zeros(len(X[0]))
+    for index, i in enumerate(Y):
+        print(i)
+        R += np.array(i)
+        G += np.array(X[index])
+    R = R/len(Y)
+    G = G/len(Y)
 
-        m,b = np.polyfit(X,Y,1)
-        Y_M = m*X + b
-        plt.plot(X,Y - Y_M, label = f"Shift {shift}  mm Distance {distance} mm")
-
+    m, b = np.polyfit(G, R, 1)
+    Y_M = m * G + b
+    print(R, G)
+    plt.plot(G, R - Y_M, label=f"mm Distance {distance} mm")
 plt.grid()
 plt.legend()
 plt.show()
